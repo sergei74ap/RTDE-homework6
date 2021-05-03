@@ -1,5 +1,6 @@
 from airflow import DAG
 from airflow.operators.postgres_operator import PostgresOperator
+from datetime import datetime
 
 USERNAME = 'sperfilyev'
 DM_DIMENSIONS = ('billing_year', 'legal_type', 'district', 'registration_year')
