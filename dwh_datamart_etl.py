@@ -1,13 +1,8 @@
-from datetime import timedelta, datetime
-from random import randint
-
 from airflow import DAG
 from airflow.operators.postgres_operator import PostgresOperator
-from airflow.operators.dummy_operator import DummyOperator
 
 USERNAME = 'sperfilyev'
 DM_DIMENSIONS = ('billing_year', 'legal_type', 'district', 'registration_year')
-DM_DIMS_TEXT = ', '.join(DM_DIMENSIONS)
 
 default_args = {
     'owner': USERNAME,
@@ -21,7 +16,7 @@ dag = DAG(
     description='DWH DM ETL tasks by ' + USERNAME,
     schedule_interval="@yearly",
     max_active_runs=1,
-    params={'schemaName': USERNAME, 'dimensionsText': DM_DIMS_TEXT},
+    params={'schemaName': USERNAME, 'dimensionsText': ', '.join(DM_DIMENSIONS)},
 )
 
 ## ОПИШЕМ ВСЕ ОПЕРАЦИИ ЗАГРУЗКИ ДАННЫХ
@@ -66,10 +61,10 @@ dimensions_fill = [
         task_id="dim_" + dim_name + "_fill",
         dag=dag,
         sql='INSERT INTO {{ params.schemaName }}.payment_report_dim_' + dim_name + '(' + dim_name + '_key)' +\
-            ' SELECT DISTINCT ' + dim_name + ' AS ' + dim_name + '_key' +\
-            ' FROM {{ params.schemaName }}.payment_report_tmp_oneyear' +\
-            ' LEFT JOIN {{ params.schemaName }}.payment_report_dim_' + dim_name +\
-            ' ON ' + dim_name + '_key=' + dim_name + ' WHERE ' + dim_name + '_key is NULL;'
+            '\n SELECT DISTINCT ' + dim_name + ' AS ' + dim_name + '_key' +\
+            '\n FROM {{ params.schemaName }}.payment_report_tmp_oneyear' +\
+            '\n LEFT JOIN {{ params.schemaName }}.payment_report_dim_' + dim_name +\
+            '\n ON ' + dim_name + '_key=' + dim_name + '\n WHERE ' + dim_name + '_key is NULL;'
     ) for dim_name in DM_DIMENSIONS
 ]
 
@@ -81,8 +76,9 @@ all_ids = ', '.join(['dim' + str(dim_num) + '.id' for dim_num, dim_name in enume
 facts_fill = PostgresOperator(
     task_id="facts_fill",
     dag=dag,
-    sql='INSERT INTO {{ params.schemaName }}.payment_report_fct SELECT ' + all_ids + ', tmp.is_vip, tmp.sum' +\
-        ' FROM {{ params.schemaName }}.payment_report_tmp_oneyear tmp\n' + all_joins
+    sql='INSERT INTO {{ params.schemaName }}.payment_report_fct' +\
+        '\n SELECT ' + all_ids + ', tmp.is_vip, tmp.sum' +\
+        '\n FROM {{ params.schemaName }}.payment_report_tmp_oneyear tmp\n ' + all_joins
 )
 
 tmp_tbl_drop = PostgresOperator(
